@@ -41,6 +41,15 @@
         }
         .btn-mic { background-color: #1f6feb; }
         .status { margin-top: 15px; font-size: 14px; color: #8b949e; }
+        .transcription {
+            margin-top: 15px;
+            padding: 10px;
+            background: #21262d;
+            border-radius: 8px;
+            font-style: italic;
+            color: #58a6ff;
+            min-height: 40px;
+        }
     </style>
 </head>
 <body>
@@ -52,15 +61,54 @@
 
     <div class="card">
         <h3>Painel de Verificação</h3>
-        <button class="btn btn-mic" onclick="startMic()">🎙️ Iniciar Escuta (Microfone)</button>
-        <button class="btn" style="margin-top:10px;">🔗 Analisar Link / Texto</button>
+        <button class="btn btn-mic" id="btnMic" onclick="toggleRecognition()">🎙️ Iniciar Escuta</button>
         
         <div id="status" class="status">Aguardando comando...</div>
+        <div id="output" class="transcription">O texto falado aparecerá aqui...</div>
     </div>
 
     <script>
-        function startMic() {
-            document.getElementById('status').innerText = "🎙️ Ouvindo... Fale algo para verificar!";
+        let recognition;
+        let isListening = false;
+
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.lang = 'pt-BR';
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                document.getElementById('output').innerText = transcript;
+            };
+
+            recognition.onerror = (event) => {
+                document.getElementById('status').innerText = 'Erro no microfone: ' + event.error;
+            };
+        } else {
+            document.getElementById('status').innerText = 'Reconhecimento de voz não suportado neste navegador.';
+        }
+
+        function toggleRecognition() {
+            if (!recognition) return;
+
+            const btn = document.getElementById('btnMic');
+            const status = document.getElementById('status');
+
+            if (isListening) {
+                recognition.stop();
+                isListening = false;
+                btn.innerText = '🎙️ Iniciar Escuta';
+                status.innerText = 'Escuta parada.';
+            } else {
+                recognition.start();
+                isListening = true;
+                btn.innerText = '🔴 Parar Escuta';
+                status.innerText = 'Ouvindo... Fale algo para verificar!';
+            }
         }
     </script>
 </body>
