@@ -5,109 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verifiq - Checagem de Fatos</title>
     <style>
-        body {
-            background-color: #0d1117;
-            color: #c9d1d9;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-            margin: 0;
-        }
-        .header { text-align: center; margin-bottom: 20px; }
-        .header h1 { color: #58a6ff; margin: 0; }
-        .card {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 12px;
-            padding: 20px;
-            width: 100%;
-            max-width: 400px;
-            box-sizing: border-box;
-            text-align: center;
-        }
-        .btn {
-            background-color: #238636;
-            color: white;
-            border: none;
-            padding: 15px;
-            border-radius: 8px;
-            width: 100%;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        .btn-mic { background-color: #1f6feb; }
-        .status { margin-top: 15px; font-size: 14px; color: #8b949e; }
-        .transcription {
-            margin-top: 15px;
-            padding: 10px;
-            background: #21262d;
-            border-radius: 8px;
-            font-style: italic;
-            color: #58a6ff;
-            min-height: 40px;
-        }
+        body { background-color: #0d1117; color: #c9d1d9; font-family: sans-serif; padding: 20px; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; text-align: center; }
+        .btn { background-color: #238636; color: white; border: none; padding: 15px; border-radius: 8px; width: 100%; font-weight: bold; margin-top: 10px; }
+        .btn-check { background-color: #d29922; }
+        .verdict { margin-top: 20px; padding: 15px; border-radius: 8px; font-weight: bold; display: none; }
     </style>
 </head>
 <body>
-
-    <div class="header">
-        <h1>🛡️ Verifiq</h1>
-        <p>Fact-Checking em Tempo Real</p>
-    </div>
-
     <div class="card">
-        <h3>Painel de Verificação</h3>
-        <button class="btn btn-mic" id="btnMic" onclick="toggleRecognition()">🎙️ Iniciar Escuta</button>
-        
-        <div id="status" class="status">Aguardando comando...</div>
-        <div id="output" class="transcription">O texto falado aparecerá aqui...</div>
+        <h1>🛡️ Verifiq</h1>
+        <div id="output" style="background:#21262d; padding:10px; border-radius:8px; min-height: 50px;">Aguardando...</div>
+        <button class="btn" id="btnMic" onclick="toggleRecognition()">🎙️ Iniciar Escuta</button>
+        <button class="btn btn-check" onclick="checkFact()">🔍 Verificar Fato</button>
+        <div id="verdict" class="verdict"></div>
     </div>
 
     <script>
-        let recognition;
+        let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'pt-BR';
         let isListening = false;
 
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.lang = 'pt-BR';
-
-            recognition.onresult = (event) => {
-                let transcript = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    transcript += event.results[i][0].transcript;
-                }
-                document.getElementById('output').innerText = transcript;
-            };
-
-            recognition.onerror = (event) => {
-                document.getElementById('status').innerText = 'Erro no microfone: ' + event.error;
-            };
-        } else {
-            document.getElementById('status').innerText = 'Reconhecimento de voz não suportado neste navegador.';
-        }
+        recognition.onresult = (event) => {
+            document.getElementById('output').innerText = event.results[0][0].transcript;
+        };
 
         function toggleRecognition() {
-            if (!recognition) return;
+            if(isListening) { recognition.stop(); isListening = false; document.getElementById('btnMic').innerText = '🎙️ Iniciar Escuta'; }
+            else { recognition.start(); isListening = true; document.getElementById('btnMic').innerText = '🔴 Parar'; }
+        }
 
-            const btn = document.getElementById('btnMic');
-            const status = document.getElementById('status');
+        function checkFact() {
+            const text = document.getElementById('output').innerText.toLowerCase();
+            const verdictDiv = document.getElementById('verdict');
+            verdictDiv.style.display = 'block';
 
-            if (isListening) {
-                recognition.stop();
-                isListening = false;
-                btn.innerText = '🎙️ Iniciar Escuta';
-                status.innerText = 'Escuta parada.';
+            // Lógica de simulação (Mock)
+            if (text.includes("falso") || text.includes("mentira")) {
+                verdictDiv.style.backgroundColor = "#da3633";
+                verdictDiv.innerText = "❌ Veredito: Provável Fake News";
+            } else if (text.includes("verdade")) {
+                verdictDiv.style.backgroundColor = "#238636";
+                verdictDiv.innerText = "✅ Veredito: Provavelmente Verdadeiro";
             } else {
-                recognition.start();
-                isListening = true;
-                btn.innerText = '🔴 Parar Escuta';
-                status.innerText = 'Ouvindo... Fale algo para verificar!';
+                verdictDiv.style.backgroundColor = "#58a6ff";
+                verdictDiv.innerText = "⚠️ Necessita de mais investigação.";
             }
         }
     </script>
