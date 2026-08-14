@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifiq - Checagem de Fatos</title>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { color: #58a6ff; margin: 0; }
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .btn {
+            background-color: #238636;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn-mic { background-color: #1f6feb; }
+        .status { margin-top: 15px; font-size: 14px; color: #8b949e; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🛡️ Verifiq</h1>
+        <p>Fact-Checking em Tempo Real</p>
+    </div>
+
+    <div class="card">
+        <h3>Painel de Verificação</h3>
+        <button class="btn btn-mic" onclick="startMic()">🎙️ Iniciar Escuta (Microfone)</button>
+        <button class="btn" style="margin-top:10px;">🔗 Analisar Link / Texto</button>
+        
+        <div id="status" class="status">Aguardando comando...</div>
+    </div>
+
+    <script>
+        function startMic() {
+            document.getElementById('status').innerText = "🎙️ Ouvindo... Fale algo para verificar!";
+        }
+    </script>
+</body>
+</html>
