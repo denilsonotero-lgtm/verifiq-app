@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verifiq - Fact-Checking & IA Avançado</title>
+    <title>Verifiq - Fact-Checking & IA em Tempo Real</title>
     <style>
         body { background-color: #0d1117; color: #c9d1d9; font-family: Arial, sans-serif; padding: 20px; margin: 0; display: flex; flex-direction: column; align-items: center; }
         .header { text-align: center; margin-bottom: 20px; }
         .header h1 { color: #58a6ff; margin: 0; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; box-sizing: border-box; text-align: center; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; width: 100%; max-width: 420px; box-sizing: border-box; text-align: center; }
         .btn { background-color: #238636; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-mic { background-color: #1f6feb; }
         .btn-check { background-color: #d29922; }
@@ -18,15 +18,26 @@
         .select-box { margin-top: 15px; text-align: left; }
         .select-box label { font-size: 12px; color: #8b949e; display: block; margin-bottom: 5px; }
         .select-box select { width: 100%; padding: 10px; background: #21262d; border: 1px solid #30363d; color: white; border-radius: 6px; font-size: 14px; }
-        .results { margin-top: 20px; text-align: left; }
-        .fact-item { background: #0d1117; border: 1px solid #30363d; padding: 12px; border-radius: 8px; margin-bottom: 10px; font-size: 14px; line-height: 1.4; }
+        
+        /* Tags de resultado com cores dinâmicas */
+        .badge-container { display: flex; gap: 10px; margin-top: 15px; justify-content: center; }
+        .badge { padding: 8px 12px; border-radius: 20px; font-weight: bold; font-size: 14px; text-align: center; flex: 1; display: none; }
+        .bg-verdadeiro { background-color: #238636; color: #ffffff; }
+        .bg-falso { background-color: #da3633; color: #ffffff; }
+        .bg-impreciso { background-color: #d29922; color: #ffffff; }
+        .bg-pct-high { background-color: #2ea043; color: #ffffff; }
+        .bg-pct-med { background-color: #bb8009; color: #ffffff; }
+        .bg-pct-low { background-color: #f85149; color: #ffffff; }
+
+        .logs { margin-top: 20px; text-align: left; max-height: 250px; overflow-y: auto; }
+        .log-item { background: #0d1117; border: 1px solid #30363d; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 13px; line-height: 1.4; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h1>🛡️ Verifiq</h1>
-        <p>Análise Inteligente e Percentual de Fatos</p>
+        <p>Análise Contínua em Tempo Real</p>
     </div>
 
     <div class="card">
@@ -35,8 +46,8 @@
         <div class="select-box" style="margin-top:0;">
             <label for="mode">Modo de Captura:</label>
             <select id="mode">
-                <option value="manual">Manual (Botão Liga/Desliga)</option>
-                <option value="auto">Automático (Detecta Fim da Fala)</option>
+                <option value="manual">Manual (Análise Contínua em Tempo Real)</option>
+                <option value="auto">Automático (Para no Fim da Fala)</option>
             </select>
         </div>
 
@@ -46,6 +57,12 @@
         <div id="status" class="status">Aguardando comando...</div>
         <div id="output" class="output">O texto falado aparecerá aqui...</div>
 
+        <!-- Botões de status coloridos -->
+        <div class="badge-container">
+            <div id="badgeStatus" class="badge">Veredito</div>
+            <div id="badgePct" class="badge">0% Certeza</div>
+        </div>
+
         <div class="select-box">
             <label for="engine">Escolha onde analisar:</label>
             <select id="engine">
@@ -54,9 +71,9 @@
             </select>
         </div>
 
-        <button class="btn btn-check" onclick="processCheck()">🔍 Analisar Fato</button>
+        <button class="btn btn-check" onclick="processCheck()">🔍 Analisar Fato Manualmente</button>
 
-        <div id="results" class="results"></div>
+        <div id="logs" class="logs"></div>
     </div>
 
     <script>
@@ -68,13 +85,13 @@
         let isListening = false;
         let timerInterval;
         let secondsElapsed = 0;
+        let lastProcessedText = "";
 
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
             recognition.lang = 'pt-BR';
 
-            // Configuração do modo automático ou contínuo
             recognition.onstart = () => {
                 isListening = true;
                 startTimer();
@@ -83,30 +100,42 @@
             };
 
             recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                document.getElementById('output').innerText = transcript;
+                let currentTranscript = "";
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    currentTranscript += event.results[i][0].transcript;
+                }
+
+                document.getElementById('output').innerText = currentTranscript;
                 
-                // Se estiver no modo automático, para sozinho ao capturar a fala
                 const mode = document.getElementById('mode').value;
                 if (mode === 'auto') {
                     recognition.stop();
+                } else if (mode === 'manual') {
+                    // Tempo Real: analisa frases longas ou alteradas automaticamente
+                    if (currentTranscript.trim().length > 10 && currentTranscript !== lastProcessedText) {
+                        lastProcessedText = currentTranscript;
+                        processCheckAuto(currentTranscript);
+                    }
                 }
             };
 
             recognition.onend = () => {
-                isListening = false;
-                stopTimer();
-                document.getElementById('btnMic').innerText = '🎙️ Iniciar Escuta';
-                if(document.getElementById('status').innerText === 'Ouvindo... Fale algo!') {
+                const mode = document.getElementById('mode').value;
+                // No modo manual, reinicia a escuta automaticamente para manter o microfone ativo
+                if (isListening && mode === 'manual') {
+                    try { recognition.start(); } catch(e) {}
+                } else {
+                    isListening = false;
+                    stopTimer();
+                    document.getElementById('btnMic').innerText = '🎙️ Iniciar Escuta';
                     document.getElementById('status').innerText = 'Escuta finalizada.';
                 }
             };
 
             recognition.onerror = (event) => {
-                document.getElementById('status').innerText = 'Erro no microfone: ' + event.error;
-                stopTimer();
-                isListening = false;
-                document.getElementById('btnMic').innerText = '🎙️ Iniciar Escuta';
+                if (event.error !== 'no-speech') {
+                    document.getElementById('status').innerText = 'Erro no microfone: ' + event.error;
+                }
             };
         }
 
@@ -118,7 +147,6 @@
 
             const mode = document.getElementById('mode').value;
             
-            // Define se continua ouvindo ou encerra sozinho na pausa
             if (mode === 'auto') {
                 recognition.continuous = false;
                 recognition.interimResults = false;
@@ -128,10 +156,11 @@
             }
 
             if (isListening) {
+                isListening = false;
                 recognition.stop();
             } else {
                 document.getElementById('output').innerText = "O texto falado aparecerá aqui...";
-                document.getElementById('results').innerHTML = "";
+                lastProcessedText = "";
                 try {
                     recognition.start();
                 } catch(e) {
@@ -162,13 +191,15 @@
 
         async function processCheck() {
             const text = document.getElementById('output').innerText;
-            const engine = document.getElementById('engine').value;
-
             if (!text || text === "O texto falado aparecerá aqui...") {
                 alert("Fale algo no microfone primeiro!");
                 return;
             }
+            await processCheckAuto(text);
+        }
 
+        async function processCheckAuto(text) {
+            const engine = document.getElementById('engine').value;
             if (engine === "factcheck") {
                 await checkFactCheckAPI(text);
             } else {
@@ -176,30 +207,62 @@
             }
         }
 
+        function updateBadges(verdict, percentage) {
+            const badgeStatus = document.getElementById('badgeStatus');
+            const badgePct = document.getElementById('badgePct');
+
+            badgeStatus.style.display = "block";
+            badgePct.style.display = "block";
+
+            // Atualiza cor do Veredito
+            badgeStatus.className = "badge";
+            if (verdict.includes("Verdadeiro") || verdict.includes("Verdadeira")) {
+                badgeStatus.classList.add("bg-verdadeiro");
+                badgeStatus.innerText = "✓ Verdadeiro";
+            } else if (verdict.includes("Falso") || verdict.includes("Falsa")) {
+                badgeStatus.classList.add("bg-falso");
+                badgeStatus.innerText = "✗ Falso";
+            } else {
+                badgeStatus.classList.add("bg-impreciso");
+                badgeStatus.innerText = "⚠ Impreciso";
+            }
+
+            // Atualiza cor da Porcentagem
+            badgePct.className = "badge";
+            const pctNum = parseInt(percentage) || 0;
+            if (pctNum >= 75) {
+                badgePct.classList.add("bg-pct-high");
+            } else if (pctNum >= 40) {
+                badgePct.classList.add("bg-pct-med");
+            } else {
+                badgePct.classList.add("bg-pct-low");
+            }
+            badgePct.innerText = `${pctNum}% Certeza`;
+        }
+
         async function checkFactCheckAPI(text) {
-            document.getElementById('results').innerHTML = "Consultando agências...";
+            const logs = document.getElementById('logs');
             const url = `https://factchecktools.googleapis.com/v1alpha1/claims:search?query=${encodeURIComponent(text)}&languageCode=pt&key=${GOOGLE_FACT_CHECK_KEY}`;
             try {
                 const response = await fetch(url);
                 const data = await response.json();
                 if (data.claims && data.claims.length > 0) {
-                    document.getElementById('results').innerHTML = data.claims.map(c => `<div class='fact-item'><strong>Alegação:</strong> ${c.text}<br>📌 Veredito: ${c.claimReview[0].textualRating}</div>`).join('');
+                    const rating = data.claims[0].claimReview[0].textualRating;
+                    updateBadges(rating, "80");
+                    logs.innerHTML = `<div class='log-item'>📌 <strong>Agência:</strong> ${rating}<br>${text}</div>` + logs.innerHTML;
                 } else {
-                    document.getElementById('results').innerHTML = "<div class='fact-item'>⚠️ Nenhuma checagem jornalística encontrada. Tente usar a IA Generativa.</div>";
+                    logs.innerHTML = `<div class='log-item'>⚠️ Nenhuma checagem encontrada para: "${text}"</div>` + logs.innerHTML;
                 }
-            } catch (e) { document.getElementById('results').innerHTML = "Erro na consulta."; }
+            } catch (e) { }
         }
 
         async function checkGroqAI(text) {
-            document.getElementById('results').innerHTML = "Analisando com IA e calculando percentuais...";
-            
-            const prompt = `Analise a seguinte afirmação captada por áudio: "${text}". 
-            Classifique obrigatoriamente a afirmação em uma destas categorias: Verdadeira, Falsa ou Imprecisa.
-            Atribua também um percentual de certeza para a classificação (ex: 95% Verdadeira, 80% Falsa, etc.).
-            Estruture a resposta exatamente neste formato:
-            - **Classificação:** [Verdadeira / Falsa / Imprecisa]
-            - **Percentual:** [X]% de [Verdade / Falsidade / Imprecisão]
-            - **Explicação:** [Breve explicação em até 2 frases]`;
+            const logs = document.getElementById('logs');
+
+            const prompt = `Analise a seguinte frase: "${text}".
+            Responda EXATAMENTE neste formato JSON puro sem marcações extras:
+            {"veredicto": "Verdadeiro", "porcentagem": 95, "explicacao": "Explicação curta em 1 frase."}
+            Use apenas "Verdadeiro", "Falso" ou "Impreciso" no campo veredicto.`;
 
             try {
                 const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -211,11 +274,21 @@
                     })
                 });
                 const data = await response.json();
-                const aiResponse = data.choices[0].message.content;
-                document.getElementById('results').innerHTML = `<div class='fact-item'>${aiResponse.replace(/\n/g, '<br>')}</div>`;
-            } catch (e) { 
-                document.getElementById('results').innerHTML = "<div class='fact-item'>Erro na consulta da IA. Verifique sua chave do Groq.</div>"; 
-            }
+                const content = data.choices[0].message.content;
+                
+                // Parse do resultado
+                const parsed = JSON.parse(content.substring(content.indexOf('{'), content.lastIndexOf('}') + 1));
+                
+                updateBadges(parsed.veredicto, parsed.porcentagem);
+
+                const logEntry = `
+                    <div class='log-item'>
+                        <strong>[${parsed.veredicto} - ${parsed.porcentagem}%]</strong> ${text}<br>
+                        <small style="color:#8b949e;">${parsed.explicacao}</small>
+                    </div>`;
+                
+                logs.innerHTML = logEntry + logs.innerHTML;
+            } catch (e) { }
         }
     </script>
 </body>
