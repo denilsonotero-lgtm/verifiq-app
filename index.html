@@ -12,7 +12,6 @@
         .btn { background-color: #238636; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-mic { background-color: #1f6feb; }
         .btn-check { background-color: #d29922; }
-        .btn-sound { background-color: #21262d; border: 1px solid #30363d; color: #c9d1d9; margin-top: 10px; font-size: 13px; padding: 8px; }
         .status { margin-top: 10px; font-size: 14px; color: #8b949e; }
         .timer { font-size: 18px; font-weight: bold; color: #f0f6fc; margin: 10px 0; }
         .output { margin-top: 15px; padding: 12px; background: #21262d; border-radius: 8px; color: #58a6ff; min-height: 40px; word-break: break-word; text-align: left; }
@@ -49,7 +48,6 @@
         </div>
 
         <button class="btn btn-mic" id="btnMic" onclick="toggleRecognition()">🎙️ Iniciar Escuta</button>
-        <button class="btn btn-sound" id="btnSound" onclick="toggleSound()">🔊 Sons: Ativados</button>
         
         <div id="timer" class="timer">⏱️ 00:00</div>
         <div id="status" class="status">Aguardando comando...</div>
@@ -81,62 +79,10 @@
         let recognition;
         let isListening = false;
         let isManualAction = false;
-        let soundEnabled = true;
         let timerInterval = null;
         let secondsElapsed = 0;
         let lastProcessedText = "";
         let analysisTimeout = null;
-
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-        function playBeep(type) {
-            if (!soundEnabled) return;
-            try {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                const now = audioCtx.currentTime;
-
-                if (type === 'start') {
-                    osc.frequency.setValueAtTime(440, now);
-                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
-                    gain.gain.setValueAtTime(0.1, now);
-                    gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
-                    osc.start(now); osc.stop(now + 0.15);
-                } else if (type === 'stop') {
-                    osc.frequency.setValueAtTime(880, now);
-                    osc.frequency.exponentialRampToValueAtTime(440, now + 0.15);
-                    gain.gain.setValueAtTime(0.1, now);
-                    gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
-                    osc.start(now); osc.stop(now + 0.15);
-                } else if (type === 'verdadeiro') {
-                    const osc2 = audioCtx.createOscillator();
-                    const gain2 = audioCtx.createGain();
-                    osc2.connect(gain2); gain2.connect(audioCtx.destination);
-                    osc.frequency.setValueAtTime(523.25, now);
-                    osc2.frequency.setValueAtTime(659.25, now);
-                    gain.gain.setValueAtTime(0.12, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-                    gain2.gain.setValueAtTime(0.12, now); gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-                    osc.start(now); osc2.start(now);
-                    osc.stop(now + 0.35); osc2.stop(now + 0.35);
-                } else if (type === 'falso') {
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(220, now);
-                    osc.frequency.exponentialRampToValueAtTime(170, now + 0.3);
-                    gain.gain.setValueAtTime(0.12, now);
-                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-                    osc.start(now); osc.stop(now + 0.3);
-                }
-            } catch(e){}
-        }
-
-        function toggleSound() {
-            soundEnabled = !soundEnabled;
-            const btn = document.getElementById('btnSound');
-            btn.innerText = soundEnabled ? "🔊 Sons: Ativados" : "🔇 Sons: Desativados";
-            btn.style.backgroundColor = soundEnabled ? "#21262d" : "#3d2121";
-        }
 
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -149,7 +95,6 @@
                 document.getElementById('status').innerText = 'Ouvindo... Fale algo!';
                 if (isManualAction) {
                     startTimer();
-                    playBeep('start');
                     isManualAction = false;
                 }
             };
@@ -166,7 +111,6 @@
                 if (mode === 'auto') {
                     recognition.stop();
                 } else if (mode === 'manual') {
-                    // Aguarda 1.5s após a última palavra para garatinr uma frase completa e precisa
                     clearTimeout(analysisTimeout);
                     const cleanText = currentTranscript.trim();
                     if (cleanText.length > 8 && cleanText !== lastProcessedText) {
@@ -185,7 +129,6 @@
                 } else {
                     if (isManualAction) {
                         stopTimer();
-                        playBeep('stop');
                         isManualAction = false;
                     }
                     isListening = false;
@@ -205,10 +148,6 @@
             if (!recognition) {
                 alert("Seu navegador não suporta reconhecimento de voz.");
                 return;
-            }
-
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
             }
 
             isManualAction = true;
@@ -285,22 +224,36 @@
             const pctNum = Math.min(Math.max(parseInt(percentage) || 0, 0), 100);
 
             badgeStatus.className = "badge";
+            let isTrue = false;
+            let isFalse = false;
+
             if (verdict.includes("Verdadeiro") || verdict.includes("Verdadeira")) {
                 badgeStatus.classList.add("bg-verdadeiro");
                 badgeStatus.innerText = "✓ Verdadeiro";
-                playBeep('verdadeiro');
+                isTrue = true;
             } else if (verdict.includes("Falso") || verdict.includes("Falsa")) {
                 badgeStatus.classList.add("bg-falso");
                 badgeStatus.innerText = "✗ Falso";
-                playBeep('falso');
+                isFalse = true;
             } else {
                 badgeStatus.classList.add("bg-impreciso");
                 badgeStatus.innerText = "⚠ Impreciso";
             }
 
-            const hue = Math.round((pctNum / 100) * 120); 
+            // Cálculo do gradiente de cores (0 a 120 no HSL):
+            // 0 = Vermelho | 60 = Amarelo | 120 = Verde
+            let hue = 60; // Padrão impreciso (Amarelo)
+
+            if (isTrue) {
+                // Verdadeiro: começa em 0 (Vermelho em 0%) e vai até 120 (Verde em 100%)
+                hue = Math.round((pctNum / 100) * 120);
+            } else if (isFalse) {
+                // Falso: começa em 120 (Verde em 0%) e vai até 0 (Vermelho em 100%)
+                hue = Math.round(120 - ((pctNum / 100) * 120));
+            }
+
             badgePct.className = "badge";
-            badgePct.style.backgroundColor = `hsl(${hue}, 80%, 35%)`;
+            badgePct.style.backgroundColor = `hsl(${hue}, 85%, 35%)`;
             badgePct.style.color = "#ffffff";
             badgePct.innerText = `${pctNum}% Certeza`;
         }
