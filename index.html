@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verifiq - Checagem de Fatos</title>
+    <title>Verifiq - Fact-Checking & IA</title>
     <style>
         body { background-color: #0d1117; color: #c9d1d9; font-family: Arial, sans-serif; padding: 20px; margin: 0; display: flex; flex-direction: column; align-items: center; }
         .header { text-align: center; margin-bottom: 20px; }
@@ -14,8 +14,11 @@
         .btn-check { background-color: #d29922; }
         .status { margin-top: 10px; font-size: 14px; color: #8b949e; }
         .output { margin-top: 15px; padding: 12px; background: #21262d; border-radius: 8px; color: #58a6ff; min-height: 40px; word-break: break-word; }
+        .select-box { margin-top: 15px; text-align: left; }
+        .select-box label { font-size: 12px; color: #8b949e; display: block; margin-bottom: 5px; }
+        .select-box select { width: 100%; padding: 10px; background: #21262d; border: 1px solid #30363d; color: white; border-radius: 6px; font-size: 14px; }
         .results { margin-top: 20px; text-align: left; }
-        .fact-item { background: #0d1117; border: 1px solid #30363d; padding: 12px; border-radius: 8px; margin-bottom: 10px; }
+        .fact-item { background: #0d1117; border: 1px solid #30363d; padding: 12px; border-radius: 8px; margin-bottom: 10px; font-size: 14px; line-height: 1.4; }
         .rating { font-weight: bold; color: #f85149; margin-top: 5px; }
     </style>
 </head>
@@ -23,24 +26,33 @@
 
     <div class="header">
         <h1>🛡️ Verifiq</h1>
-        <p>Fact-Checking em Tempo Real</p>
+        <p>Fact-Checking & Análise Inteligente</p>
     </div>
 
     <div class="card">
         <h3>Painel de Verificação</h3>
+        
         <button class="btn btn-mic" id="btnMic" onclick="toggleRecognition()">🎙️ Iniciar Escuta</button>
         
         <div id="status" class="status">Aguardando comando...</div>
         <div id="output" class="output">O texto falado aparecerá aqui...</div>
 
-        <button class="btn btn-check" onclick="checkFactWithGoogle()">🔍 Checar com o Google</button>
+        <div class="select-box">
+            <label for="engine">Escolha onde analisar:</label>
+            <select id="engine">
+                <option value="gemini">🤖 Gemini AI (Responde Histórias/Dúvidas)</option>
+                <option value="factcheck">📰 Google Fact Check (Busca em Jornais)</option>
+            </select>
+        </div>
+
+        <button class="btn btn-check" onclick="processCheck()">🔍 Analisar Fato</button>
 
         <div id="results" class="results"></div>
     </div>
 
     <script>
-        // COLE A SUA CHAVE DA API ABAIXO ENTRE AS ASPAS:
-        const GOOGLE_API_KEY = "AIzaSyDztr03Zd3MGyaERYTjnq60LIxuAlRtrBA";
+        // === COLE SUA CHAVE DENTRO DAS ASPAS ABAIXO ===
+        const MINHA_CHAVE_API = "AIzaSyDztr03Zd3MGyaERYTjnq60LIxuAlRtrBA";
 
         let recognition;
         let isListening = false;
@@ -51,15 +63,12 @@
             recognition.lang = 'pt-BR';
 
             recognition.onresult = (event) => {
-                let transcript = event.results[0][0].transcript;
-                document.getElementById('output').innerText = transcript;
+                document.getElementById('output').innerText = event.results[0][0].transcript;
             };
 
             recognition.onerror = (event) => {
                 document.getElementById('status').innerText = 'Erro no microfone: ' + event.error;
             };
-        } else {
-            document.getElementById('status').innerText = 'Navegador sem suporte ao microfone.';
         }
 
         function toggleRecognition() {
@@ -80,28 +89,38 @@
             }
         }
 
-        async function checkFactWithGoogle() {
+        async function processCheck() {
             const text = document.getElementById('output').innerText;
-            const resultsDiv = document.getElementById('results');
-            const status = document.getElementById('status');
+            const engine = document.getElementById('engine').value;
 
             if (!text || text === "O texto falado aparecerá aqui...") {
                 alert("Fale algo no microfone primeiro!");
                 return;
             }
 
-            status.innerText = "Consultando base do Google...";
+            if (engine === "factcheck") {
+                await checkFactCheckAPI(text);
+            } else if (engine === "gemini") {
+                await checkGeminiAI(text);
+            }
+        }
+
+        // 1. Consulta no Fact Check (Notícias)
+        async function checkFactCheckAPI(text) {
+            const resultsDiv = document.getElementById('results');
+            const status = document.getElementById('status');
+
+            status.innerText = "Consultando agências de notícia...";
             resultsDiv.innerHTML = "";
 
-            const url = `https://factchecktools.googleapis.com/v1alpha1/claims:search?query=${encodeURIComponent(text)}&languageCode=pt&key=${GOOGLE_API_KEY}`;
+            const url = `https://factchecktools.googleapis.com/v1alpha1/claims:search?query=${encodeURIComponent(text)}&languageCode=pt&key=${MINHA_CHAVE_API}`;
 
             try {
                 const response = await fetch(url);
                 const data = await response.json();
 
                 if (data.claims && data.claims.length > 0) {
-                    status.innerText = `Encontrado(s) ${data.claims.length} resultado(s):`;
-                    
+                    status.innerText = `Resultados das Agências:`;
                     data.claims.forEach(claim => {
                         const review = claim.claimReview[0];
                         const item = document.createElement('div');
@@ -109,18 +128,54 @@
                         item.innerHTML = `
                             <strong>Alegação:</strong> ${claim.text || 'Sem texto'}<br>
                             <div class="rating">📌 Veredito: ${review.textualRating || 'Não especificado'}</div>
-                            <small>Checado por: ${review.publisher.name || 'Agência'}</small><br>
+                            <small>Fonte: ${review.publisher.name}</small><br>
                             <a href="${review.url}" target="_blank" style="color:#58a6ff;">Ler matéria completa 🔗</a>
                         `;
                         resultsDiv.appendChild(item);
                     });
                 } else {
-                    status.innerText = "Nenhuma checagem encontrada para esse termo.";
-                    resultsDiv.innerHTML = "<div class='fact-item'>⚠️ Nenhuma checagem correspondente foi encontrada no banco de dados.</div>";
+                    status.innerText = "Sem registros nas agências.";
+                    resultsDiv.innerHTML = "<div class='fact-item'>⚠️ Nenhuma checagem jornalística encontrada. Alterne para a opção 'Gemini AI'.</div>";
                 }
             } catch (error) {
-                status.innerText = "Erro ao buscar checagem.";
-                console.error(error);
+                status.innerText = "Erro ao buscar nas agências.";
+            }
+        }
+
+        // 2. Consulta no Gemini (Inteligência Artificial)
+        async function checkGeminiAI(text) {
+            const resultsDiv = document.getElementById('results');
+            const status = document.getElementById('status');
+
+            status.innerText = "Analisando com Inteligência Artificial...";
+            resultsDiv.innerHTML = "";
+
+            const prompt = `Analise a frase: "${text}". Diga em português se ela é Verdadeira, Falsa ou Fato Histórico, e explique resumidamente em 2 frases.`;
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MINHA_CHAVE_API}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+
+                const data = await response.json();
+                const aiResponse = data.candidates[0].content.parts[0].text;
+
+                status.innerText = "Análise da IA pronta:";
+                resultsDiv.innerHTML = `
+                    <div class='fact-item'>
+                        <strong>🤖 Veredito do Gemini AI:</strong><br><br>
+                        ${aiResponse.replace(/\n/g, '<br>')}
+                    </div>
+                `;
+            } catch (error) {
+                status.innerText = "Erro ao consultar a IA.";
+                resultsDiv.innerHTML = "<div class='fact-item'>⚠️ Não foi possível consultar a IA com essa chave. Tente usar a opção 'Google Fact Check'.</div>";
             }
         }
     </script>
