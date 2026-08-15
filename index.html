@@ -5,51 +5,122 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verifiq - Checagem de Fatos</title>
     <style>
-        body { background-color: #0d1117; color: #c9d1d9; font-family: sans-serif; padding: 20px; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; text-align: center; }
-        .btn { background-color: #238636; color: white; border: none; padding: 15px; border-radius: 8px; width: 100%; font-weight: bold; margin-top: 10px; }
+        body { background-color: #0d1117; color: #c9d1d9; font-family: Arial, sans-serif; padding: 20px; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { color: #58a6ff; margin: 0; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; box-sizing: border-box; text-align: center; }
+        .btn { background-color: #238636; color: white; border: none; padding: 15px; border-radius: 8px; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-mic { background-color: #1f6feb; }
         .btn-check { background-color: #d29922; }
-        .verdict { margin-top: 20px; padding: 15px; border-radius: 8px; font-weight: bold; display: none; }
+        .status { margin-top: 10px; font-size: 14px; color: #8b949e; }
+        .output { margin-top: 15px; padding: 12px; background: #21262d; border-radius: 8px; color: #58a6ff; min-height: 40px; word-break: break-word; }
+        .results { margin-top: 20px; text-align: left; }
+        .fact-item { background: #0d1117; border: 1px solid #30363d; padding: 12px; border-radius: 8px; margin-bottom: 10px; }
+        .rating { font-weight: bold; color: #f85149; margin-top: 5px; }
     </style>
 </head>
 <body>
-    <div class="card">
+
+    <div class="header">
         <h1>🛡️ Verifiq</h1>
-        <div id="output" style="background:#21262d; padding:10px; border-radius:8px; min-height: 50px;">Aguardando...</div>
-        <button class="btn" id="btnMic" onclick="toggleRecognition()">🎙️ Iniciar Escuta</button>
-        <button class="btn btn-check" onclick="checkFact()">🔍 Verificar Fato</button>
-        <div id="verdict" class="verdict"></div>
+        <p>Fact-Checking em Tempo Real</p>
+    </div>
+
+    <div class="card">
+        <h3>Painel de Verificação</h3>
+        <button class="btn btn-mic" id="btnMic" onclick="toggleRecognition()">🎙️ Iniciar Escuta</button>
+        
+        <div id="status" class="status">Aguardando comando...</div>
+        <div id="output" class="output">O texto falado aparecerá aqui...</div>
+
+        <button class="btn btn-check" onclick="checkFactWithGoogle()">🔍 Checar com o Google</button>
+
+        <div id="results" class="results"></div>
     </div>
 
     <script>
-        let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = 'pt-BR';
+        // COLE A SUA CHAVE DA API ABAIXO ENTRE AS ASPAS:
+        const GOOGLE_API_KEY = "AIzaSyDztr03Zd3MGyaERYTjnq60LIxuAlRtrBA";
+
+        let recognition;
         let isListening = false;
 
-        recognition.onresult = (event) => {
-            document.getElementById('output').innerText = event.results[0][0].transcript;
-        };
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'pt-BR';
 
-        function toggleRecognition() {
-            if(isListening) { recognition.stop(); isListening = false; document.getElementById('btnMic').innerText = '🎙️ Iniciar Escuta'; }
-            else { recognition.start(); isListening = true; document.getElementById('btnMic').innerText = '🔴 Parar'; }
+            recognition.onresult = (event) => {
+                let transcript = event.results[0][0].transcript;
+                document.getElementById('output').innerText = transcript;
+            };
+
+            recognition.onerror = (event) => {
+                document.getElementById('status').innerText = 'Erro no microfone: ' + event.error;
+            };
+        } else {
+            document.getElementById('status').innerText = 'Navegador sem suporte ao microfone.';
         }
 
-        function checkFact() {
-            const text = document.getElementById('output').innerText.toLowerCase();
-            const verdictDiv = document.getElementById('verdict');
-            verdictDiv.style.display = 'block';
+        function toggleRecognition() {
+            if (!recognition) return;
+            const btn = document.getElementById('btnMic');
+            const status = document.getElementById('status');
 
-            // Lógica de simulação (Mock)
-            if (text.includes("falso") || text.includes("mentira")) {
-                verdictDiv.style.backgroundColor = "#da3633";
-                verdictDiv.innerText = "❌ Veredito: Provável Fake News";
-            } else if (text.includes("verdade")) {
-                verdictDiv.style.backgroundColor = "#238636";
-                verdictDiv.innerText = "✅ Veredito: Provavelmente Verdadeiro";
+            if (isListening) {
+                recognition.stop();
+                isListening = false;
+                btn.innerText = '🎙️ Iniciar Escuta';
+                status.innerText = 'Escuta parada.';
             } else {
-                verdictDiv.style.backgroundColor = "#58a6ff";
-                verdictDiv.innerText = "⚠️ Necessita de mais investigação.";
+                recognition.start();
+                isListening = true;
+                btn.innerText = '🔴 Parar Escuta';
+                status.innerText = 'Ouvindo... Fale algo!';
+            }
+        }
+
+        async function checkFactWithGoogle() {
+            const text = document.getElementById('output').innerText;
+            const resultsDiv = document.getElementById('results');
+            const status = document.getElementById('status');
+
+            if (!text || text === "O texto falado aparecerá aqui...") {
+                alert("Fale algo no microfone primeiro!");
+                return;
+            }
+
+            status.innerText = "Consultando base do Google...";
+            resultsDiv.innerHTML = "";
+
+            const url = `https://factchecktools.googleapis.com/v1alpha1/claims:search?query=${encodeURIComponent(text)}&languageCode=pt&key=${GOOGLE_API_KEY}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.claims && data.claims.length > 0) {
+                    status.innerText = `Encontrado(s) ${data.claims.length} resultado(s):`;
+                    
+                    data.claims.forEach(claim => {
+                        const review = claim.claimReview[0];
+                        const item = document.createElement('div');
+                        item.className = 'fact-item';
+                        item.innerHTML = `
+                            <strong>Alegação:</strong> ${claim.text || 'Sem texto'}<br>
+                            <div class="rating">📌 Veredito: ${review.textualRating || 'Não especificado'}</div>
+                            <small>Checado por: ${review.publisher.name || 'Agência'}</small><br>
+                            <a href="${review.url}" target="_blank" style="color:#58a6ff;">Ler matéria completa 🔗</a>
+                        `;
+                        resultsDiv.appendChild(item);
+                    });
+                } else {
+                    status.innerText = "Nenhuma checagem encontrada para esse termo.";
+                    resultsDiv.innerHTML = "<div class='fact-item'>⚠️ Nenhuma checagem correspondente foi encontrada no banco de dados.</div>";
+                }
+            } catch (error) {
+                status.innerText = "Erro ao buscar checagem.";
+                console.error(error);
             }
         }
     </script>
